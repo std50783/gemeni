@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeMentor - เรียนเขียนโค้ดอย่างชาญฉลาด</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .code-editor-container {
+            position: relative;
+        }
+        .line-numbers {
+            position: absolute;
+            top: 0;
+            left: 0;
+            padding: 1rem 0;
+            color: #6b7280;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            text-align: right;
+            border-right: 1px solid #e5e7eb;
+            background-color: #f3f4f6;
+            user-select: none;
+            overflow-y: hidden;
+            z-index: 10;
+        }
+        .line-numbers > div {
+            height: 1.5rem; /* Match line height of the code editor */
+            padding-right: 0.5rem;
+        }
+        .code-editor, .input-data {
+            font-family: 'Courier New', monospace;
+            tab-size: 4;
+            caret-color: #4f46e5;
+            resize: none;
+            overflow-x: auto;
+            white-space: pre;
+            padding-left: 3.5rem; /* Space for line numbers */
+        }
+        .loading-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #4f46e5;
+            animation: spin 1s ease infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            max-width: 500px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <header class="bg-white shadow-lg border-b-4 border-indigo-500">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-indigo-600 text-white p-2 rounded-lg">
+                        <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-800">CodeMentor</h1>
+                        <p class="text-sm text-gray-600">เรียนเขียนโค้ดอย่างชาญฉลาด</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                        🎯 ตรวจจับข้อผิดพลาดแม่นยำ
+                    </span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-6 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="bg-gray-800 text-white px-6 py-4 flex items-center justify-between">
+                        <h2 class="text-lg font-semibold">💻 Code Editor</h2>
+                        <div class="flex items-center space-x-4">
+                            <select id="languageSelect" class="bg-gray-700 text-white px-3 py-1 rounded-lg border-none text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors">
+                                <option value="python">🐍 Python</option>
+                                <option value="javascript">🟨 JavaScript</option>
+                                <option value="java">☕ Java</option>
+                                <option value="cpp">⚡ C++</option>
+                                <option value="html">🌐 HTML</option>
+                                <option value="css">🎨 CSS</option>
+                            </select>
+                            <button id="checkCodeBtn" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                                ตรวจสอบโค้ด
+                            </button>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <!-- Code Editor with Line Numbers -->
+                        <div class="code-editor-container bg-gray-100 rounded-lg border border-gray-300 overflow-hidden relative mb-4">
+                            <div id="lineNumbers" class="line-numbers w-14 h-96"></div>
+                            <textarea id="codeEditor" class="code-editor w-full h-96 p-4 bg-transparent outline-none resize-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"></textarea>
+                        </div>
+                        
+                        <!-- New Input Data Field -->
+                        <div>
+                            <label for="inputData" class="block text-sm font-medium text-gray-700 mb-1">ช่องสำหรับป้อนข้อมูล Input</label>
+                            <textarea id="inputData" class="input-data w-full h-24 p-4 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all" placeholder="ป้อนข้อมูลที่จะใช้ในโค้ด (เช่น ตัวเลข, ข้อความ)"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                    <div id="analysisSection" class="bg-white rounded-xl shadow-lg overflow-hidden">
+                        <div id="analysisHeader" class="bg-red-600 text-white px-6 py-4">
+                            <h3 class="text-lg font-semibold">🔍 การวิเคราะห์ข้อผิดพลาด</h3>
+                        </div>
+                        <div id="errorResults" class="p-6 min-h-[100px] flex items-center justify-center">
+                            <div class="text-gray-500 text-center py-8">
+                                กดปุ่ม "ตรวจสอบโค้ด" เพื่อวิเคราะห์ข้อผิดพลาด
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="outputSection" class="bg-white rounded-xl shadow-lg overflow-hidden">
+                        <div class="bg-gray-800 text-white px-6 py-4">
+                            <h3 class="text-lg font-semibold">🖥️ ผลลัพธ์การรัน</h3>
+                        </div>
+                        <div id="runResults" class="p-6 min-h-[100px] flex items-center justify-center">
+                            <pre id="outputPre" class="text-gray-500 text-sm w-full whitespace-pre-wrap font-mono">ผลลัพธ์จะแสดงที่นี่หลังจากตรวจสอบโค้ด</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="bg-green-600 text-white px-6 py-4">
+                        <h3 class="text-lg font-semibold">💡 เคล็ดลับการเขียนโค้ด</h3>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div class="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-400">
+                            <h4 class="font-semibold text-blue-800">Python Tips</h4>
+                            <p class="text-sm text-blue-700 mt-1">ใช้ try-except เพื่อจัดการข้อผิดพลาด</p>
+                        </div>
+                        <div class="bg-yellow-50 p-4 rounded-lg border-l-4 border-yellow-400">
+                            <h4 class="font-semibold text-yellow-800">JavaScript Tips</h4>
+                            <p class="text-sm text-yellow-700 mt-1">ใช้ console.log() เพื่อ debug โค้ด</p>
+                        </div>
+                        <div class="bg-purple-50 p-4 rounded-lg border-l-4 border-purple-400">
+                            <h4 class="font-semibold text-purple-800">General Tips</h4>
+                            <p class="text-sm text-purple-700 mt-1">ตั้งชื่อตัวแปรให้มีความหมาย</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="bg-orange-600 text-white px-6 py-4">
+                        <h3 class="text-lg font-semibold">⚠️ ข้อผิดพลาดที่พบบ่อย</h3>
+                    </div>
+                    <div class="p-6 space-y-3">
+                        <div class="flex items-start space-x-3">
+                            <span class="text-red-500 font-bold">1.</span>
+                            <div>
+                                <p class="font-medium text-gray-800">Division by Zero</p>
+                                <p class="text-sm text-gray-600">การหารด้วยศูนย์</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start space-x-3">
+                            <span class="text-red-500 font-bold">2.</span>
+                            <div>
+                                <p class="font-medium text-gray-800">Syntax Error</p>
+                                <p class="text-sm text-gray-600">ไวยากรณ์ผิด</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start space-x-3">
+                            <span class="text-red-500 font-bold">3.</span>
+                            <div>
+                                <p class="font-medium text-gray-800">Undefined Variable</p>
+                                <p class="text-sm text-gray-600">ตัวแปรที่ไม่ได้ประกาศ</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="bg-indigo-600 text-white px-6 py-4">
+                        <h3 class="text-lg font-semibold">ตัวอย่างการแก้ไข</h3>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div class="bg-gray-100 p-4 rounded-lg border-l-4 border-gray-400">
+                            <h4 class="font-semibold text-gray-800 mb-2">โค้ดที่มีปัญหา (Python)</h4>
+                            <pre class="text-sm text-gray-700 bg-gray-200 p-2 rounded-md overflow-x-auto">
+print("Hello World")
+x = 10
+y = 0
+result = x / y
+print(result)</pre>
+                        </div>
+                        <div class="bg-red-50 border-red-200 border rounded-lg p-4">
+                            <div class="flex items-start justify-between mb-2">
+                                <h4 class="font-semibold text-red-800">🚨 ข้อผิดพลาด: Runtime Error</h4>
+                                <span class="bg-gray-200 text-gray-700 px-2 py-1 rounded-full text-xs font-semibold">บรรทัดที่ 4</span>
+                            </div>
+                            <p class="text-gray-700 mb-2">เกิดข้อผิดพลาดในการหารด้วยศูนย์: คุณพยายามหารตัวแปร x ด้วยตัวแปร y ซึ่งมีค่าเป็น 0</p>
+                            <div class="bg-white p-3 rounded-lg border-l-4 border-indigo-400">
+                                <p class="text-sm"><strong>💡 วิธีแก้ไข:</strong> ตรวจสอบค่าของตัวแปร y ก่อนทำการหาร เช่น `if y != 0: ...` หรือใช้ `try-except` block เพื่อจัดการข้อผิดพลาด</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="loadingModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="flex justify-center items-center mb-4">
+                <div class="loading-spinner"></div>
+            </div>
+            <h4 class="text-lg font-semibold text-gray-800">กำลังวิเคราะห์โค้ด...</h4>
+            <p class="text-sm text-gray-500 mt-1">โปรดรอสักครู่</p>
+        </div>
+    </div>
+
+    <script>
+        // API key and URL for Gemini API
+        const apiKey = 'AIzaSyBXOGgPxnREYBzcU9jj-F5oZxl5oRz3YxM';
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+       
+        const codeEditor = document.getElementById('codeEditor');
+        const inputData = document.getElementById('inputData');
+        const languageSelect = document.getElementById('languageSelect');
+        const checkCodeBtn = document.getElementById('checkCodeBtn');
+        const errorResults = document.getElementById('errorResults');
+        const runResults = document.getElementById('runResults');
+        const loadingModal = document.getElementById('loadingModal');
+        const lineNumbers = document.getElementById('lineNumbers');
+        const analysisHeader = document.getElementById('analysisHeader');
+        const analysisSection = document.getElementById('analysisSection');
+
+        // Sample code templates for different languages
+        const codeTemplates = {
+            python: `x = 10
+y = 5
+result = x / y
+print(f"ผลลัพธ์คือ: {result}")`,
+            javascript: `let x = 10;
+let y = 5;
+let result = x / y;
+console.log("ผลลัพธ์คือ: " + result);`,
+            java: `public class Main {
+    public static void main(String[] args) {
+        int x = 10;
+        int y = 5;
+        double result = (double) x / y;
+        System.out.println("ผลลัพธ์คือ: " + result);
+    }
+}`,
+            cpp: `#include <iostream>
+using namespace std;
+
+int main() {
+    int x = 10;
+    int y = 5;
+    double result = (double)x / y;
+    cout << "ผลลัพธ์คือ: " << result << endl;
+    return 0;
+}`,
+            html: `<!DOCTYPE html>
+<html>
+<head>
+    <title>My Page</title>
+</head>
+<body>
+    <h1>Hello World</h1>
+    <p>This is a paragraph</p>
+</body>
+</html>`,
+            css: `body {
+    background-color: blue;
+    color: white;
+}
+.container {
+    width: 100%;
+    margin: 0 auto;}`
+        };
+
+        // Function to update line numbers
+        function updateLineNumbers() {
+            const lines = codeEditor.value.split('\n').length;
+            let lineNumbersHtml = '';
+            for (let i = 1; i <= lines; i++) {
+                lineNumbersHtml += `<div>${i}</div>`;
+            }
+            lineNumbers.innerHTML = lineNumbersHtml;
+        }
+
+        // Sync scroll between textarea and line numbers
+        codeEditor.addEventListener('scroll', () => {
+            lineNumbers.scrollTop = codeEditor.scrollTop;
+        });
+
+        // Update line numbers on input
+        codeEditor.addEventListener('input', updateLineNumbers);
+
+        // Event listener for language selection change
+        languageSelect.addEventListener('change', function() {
+            const selectedLang = this.value;
+            codeEditor.value = codeTemplates[selectedLang] || '';
+            updateLineNumbers();
+        });
+
+        // Event listener for the "Check Code" button
+        checkCodeBtn.addEventListener('click', async function() {
+            const code = codeEditor.value;
+            const language = languageSelect.value;
+            const input_data = inputData.value;
+            
+            // Show loading modal
+            loadingModal.classList.remove('hidden');
+            
+            // Clear previous results and reset headers
+            analysisHeader.className = "bg-red-600 text-white px-6 py-4";
+            analysisHeader.querySelector('h3').textContent = '🔍 การวิเคราะห์ข้อผิดพลาด';
+            errorResults.innerHTML = `<div class="text-gray-500 text-center py-8">กำลังวิเคราะห์...</div>`;
+            runResults.innerHTML = `<pre class="text-gray-500 text-sm w-full whitespace-pre-wrap font-mono">กำลังประมวลผลผลลัพธ์...</pre>`;
+            
+            // Call the function to analyze code using the AI model
+            await analyzeCodeWithAI(code, language, input_data);
+        });
+
+        /**
+         * Analyzes the provided code using the Gemini AI model with exponential backoff for retries.
+         * @param {string} code The code to be analyzed.
+         * @param {string} language The programming language of the code.
+         * @param {string} input_data The input data provided by the user.
+         */
+        async function analyzeCodeWithAI(code, language, input_data) {
+            const prompt = `
+            You are a senior programming mentor and an expert in all major programming languages. Your task is to perform a detailed analysis of a user-provided code snippet. Do not act as a chatbot; your only output should be a single, complete JSON object.
+
+            Analyze the user's code for common errors, best practices, and logic issues. For each issue, provide a clear, direct, and actionable solution. If the code is correct, return an empty array for the 'errors' property.
+
+            Simulate the output of the code. If the code contains an error that would prevent it from running, state that in the output. Otherwise, provide the simulated output.
+
+            The user's code is in ${language}. The user's language is Thai. All error messages, descriptions, and solutions must be in Thai. The simulated output can be in Thai or English as appropriate.
+
+            User Code:
+            \`\`\`${language}
+            ${code}
+            \`\`\`
+
+            User Input:
+            \`\`\`
+            ${input_data}
+            \`\`\`
+
+            Provide a JSON response with the following structure.
+            {
+              "is_correct": boolean, // true if no significant errors are found, otherwise false
+              "errors": [
+                {
+                  "line_number": number, // The line number where the error occurs (e.g., 4)
+                  "error_type": string, // A brief, high-level category (e.g., "Syntax Error", "Logic Error", "Runtime Error", "Best Practice")
+                  "message": string, // A direct, clear, and specific description of the mistake in Thai.
+                  "solution": string // A direct, clear, and actionable suggestion for how to fix the mistake in Thai.
+                }
+              ],
+              "output": string // The simulated output from running the code. If there is an error, state that in this field.
+            }
+            Example for Python with a typo:
+            {
+              "is_correct": false,
+              "errors": [
+                {
+                  "line_number": 3,
+                  "error_type": "Syntax Error",
+                  "message": "เกิดข้อผิดพลาดทางไวยากรณ์: ตัวแปร 'reป' ไม่สามารถใช้งานได้ เนื่องจากมีตัวอักษรที่ไม่ถูกต้อง",
+                  "solution": "เปลี่ยนชื่อตัวแปรให้ถูกต้องและสอดคล้องกับมาตรฐานการตั้งชื่อ เช่น 'result'"
+                }
+              ],
+              "output": "Traceback (most recent call last):\n  File \"<stdin>\", line 3\n    reป = x / y\n    ^\nSyntaxError: invalid character 'ป' (U+0E1B)"
+            }
+            Example for correct Python code:
+            {
+              "is_correct": true,
+              "errors": [],
+              "output": "ผลลัพธ์คือ: 2.0"
+            }
+            `;
+
+            const payload = {
+                contents: [
+                    {
+                        role: "user",
+                        parts: [
+                            { text: prompt }
+                        ]
+                    }
+                ],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            is_correct: { type: "BOOLEAN" },
+                            errors: {
+                                type: "ARRAY",
+                                items: {
+                                    type: "OBJECT",
+                                    properties: {
+                                        line_number: { type: "INTEGER" },
+                                        error_type: { type: "STRING" },
+                                        message: { type: "STRING" },
+                                        solution: { type: "STRING" }
+                                    }
+                                }
+                            },
+                            output: { type: "STRING" }
+                        }
+                    }
+                }
+            };
+            
+            let retries = 0;
+            const maxRetries = 5;
+            const initialDelay = 1000; // 1 second
+
+            while (retries < maxRetries) {
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        const jsonText = result.candidates[0].content.parts[0].text;
+                        const parsedJson = JSON.parse(jsonText);
+                        displayResults(parsedJson);
+                        return; // Success, exit the loop
+                    }
+
+                    // For retryable errors (e.g., 429 Too Many Requests, 5xx server errors)
+                    if (response.status === 429 || response.status >= 500) {
+                        if (retries === 0) {
+                             displayErrorState("ไม่สามารถส่งไปยัง API เพื่อตรวจสอบได้");
+                        }
+                        retries++;
+                        const delay = initialDelay * Math.pow(2, retries - 1);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    } else {
+                        // For non-retryable errors (e.g., 400 Bad Request), throw an error
+                        const errorData = await response.json();
+                        const errorMessage = errorData.error && errorData.error.message ? errorData.error.message : response.statusText;
+                        throw new Error(`Status: ${response.status}, Message: ${errorMessage}`);
+                    }
+
+                } catch (error) {
+                    // Network error
+                    if (retries === 0) {
+                        displayErrorState("ไม่สามารถส่งไปยัง API เพื่อตรวจสอบได้");
+                    }
+                    retries++;
+                    const delay = initialDelay * Math.pow(2, retries - 1);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+
+            // If all retries fail
+            loadingModal.classList.add('hidden');
+            displayErrorState("ไม่สามารถเชื่อมต่อกับบริการ AI ได้หลังจากลองหลายครั้ง โปรดตรวจสอบการเชื่อมต่ออินเทอร์เน็ตและ API Key ของคุณ");
+        }
+
+        /**
+         * Displays the analysis results in the UI.
+         * @param {object} analysis The JSON object containing the analysis results.
+         */
+        function displayResults(analysis) {
+            loadingModal.classList.add('hidden');
+
+            // Update analysis header based on correctness
+            if (analysis.is_correct) {
+                analysisHeader.className = "bg-green-600 text-white px-6 py-4";
+                analysisHeader.querySelector('h3').textContent = '✅ ผลการวิเคราะห์โค้ด';
+            } else {
+                analysisHeader.className = "bg-red-600 text-white px-6 py-4";
+                analysisHeader.querySelector('h3').textContent = '🚨 ผลการวิเคราะห์โค้ด';
+            }
+
+            // Display errors
+            if (analysis.is_correct) {
+                errorResults.innerHTML = `
+                    <div class="text-center py-8">
+                        <div class="text-green-600 text-6xl mb-4">✅</div>
+                        <h3 class="text-xl font-semibold text-green-800 mb-2">ไม่พบข้อผิดพลาด!</h3>
+                        <p class="text-green-600">โค้ดของคุณดูดีแล้ว</p>
+                    </div>
+                `;
+            } else {
+                let html = '<div class="space-y-4">';
+                analysis.errors.forEach((error) => {
+                    const bgColor = error.error_type === 'Best Practice' ? 'bg-blue-50 border-blue-200' : 'bg-red-50 border-red-200';
+                    const textColor = error.error_type === 'Best Practice' ? 'text-blue-800' : 'text-red-800';
+                    const icon = error.error_type === 'Best Practice' ? '💡' : '🚨';
+                    const title = error.error_type === 'Best Practice' ? 'คำแนะนำ' : 'ข้อผิดพลาด';
+                    
+                    html += `
+                        <div class="${bgColor} border rounded-lg p-4">
+                            <div class="flex items-start justify-between mb-2">
+                                <h4 class="font-semibold ${textColor}">${icon} ${title}: ${error.error_type}</h4>
+                                <span class="bg-gray-200 text-gray-700 px-2 py-1 rounded-full text-xs font-semibold">บรรทัด ${error.line_number}</span>
+                            </div>
+                            <p class="text-gray-700 mb-2">${error.message}</p>
+                            <div class="bg-white p-3 rounded-lg border-l-4 border-indigo-400">
+                                <p class="text-sm"><strong>💡 วิธีแก้ไข:</strong> ${error.solution}</p>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                errorResults.innerHTML = html;
+            }
+
+            // Display output
+            runResults.innerHTML = `<pre class="text-gray-800 text-sm w-full whitespace-pre-wrap font-mono">${analysis.output}</pre>`;
+        }
+
+        /**
+         * Displays a generic error message in the UI.
+         * @param {string} message The error message to display.
+         */
+        function displayErrorState(message) {
+            loadingModal.classList.add('hidden');
+            analysisHeader.className = "bg-red-600 text-white px-6 py-4";
+            analysisHeader.querySelector('h3').textContent = '🚨 ผลการวิเคราะห์โค้ด';
+            errorResults.innerHTML = `
+                <div class="text-center py-8">
+                    <div class="text-red-600 text-6xl mb-4">❌</div>
+                    <h3 class="text-xl font-semibold text-red-800 mb-2">เกิดข้อผิดพลาด</h3>
+                    <p class="text-red-600">${message}</p>
+                </div>
+            `;
+            runResults.innerHTML = `<pre class="text-gray-500 text-sm w-full whitespace-pre-wrap font-mono">ไม่สามารถประมวลผลผลลัพธ์ได้</pre>`;
+        }
+
+        // Initialize with Python code on page load
+        codeEditor.value = codeTemplates.python;
+        updateLineNumbers();
+    </script>
+</body>
+</html>
